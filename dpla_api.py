@@ -1,18 +1,20 @@
 from dpla.api import DPLA
 from pprint import pprint
 from lxml import etree
+import ConfigParser
 
 
 class DplaApi():
-    def __init__(self, dpla_key="07c4dfca29876f8b591732735913abb4"):
-        self.dpla_key=dpla_key
+    """Interact with DPLA API using pre-acquired key."""
+    def __init__(self):
+        self.dpla_key=__load_dpla_key()
         self.dpla = DPLA(dpla_key)
         self.result = None
 
     def search(self, q_value, page_size=100):
         self.result = self.dpla.search(q=q_value, page_size=page_size)
-        print "===First Result==="
-        print "---Access [instance].result.items object to see all---"
+        print "First Result"
+        print "Access [instance].result.items object to see all"
         pprint(self.result.items[0])
 
     def return_marcxml(self):
@@ -33,13 +35,11 @@ class DplaApi():
             controlfield.text = c["#text"]
 
             for row in q_datafields:
-    datafield = etree.SubElement(root,"datafield",tag=row.tag,ind1=row.ind1,ind2=row.ind2)
-    q_subfields = Subfields.objects.using("metagds").filter(datafield=row.datafield_id)
-    for sub_row in q_subfields:
-        subfield = etree.SubElement(datafield,"subfield",code=sub_row.code)
-        subfield.text = sub_row.content
-
-
+                datafield = etree.SubElement(root,"datafield",tag=row.tag,ind1=row.ind1,ind2=row.ind2)
+                q_subfields = Subfields.objects.using("metagds").filter(datafield=row.datafield_id)
+                for sub_row in q_subfields:
+                    subfield = etree.SubElement(datafield,"subfield",code=sub_row.code)
+                    subfield.text = sub_row.content
 
 
     def return_html(self, filepath="dpla.html"):
@@ -64,6 +64,10 @@ class DplaApi():
                 f.write("<tr>")
             f.write("</table>")
 
-
+    def __load_dpla_key(self):
+        """Load DPLA API Key from config file."""
+        config = configParser.RawConfigParser()
+        config.read("default.cfg")
+        return config.get("dpla_api", "api_key")
 
 
