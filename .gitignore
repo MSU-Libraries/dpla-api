@@ -1,3 +1,5 @@
+.ipynb_checkpoints/
+data/radicalism*
 default.cfg
 .DS_Store
 *.pyc
