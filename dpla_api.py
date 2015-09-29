@@ -167,6 +167,7 @@ class DplaApi():
         d_metadata.record["genre"] = ""
         d_metadata.record["federation"] = "SiRO"
         d_metadata.record["original_query"] = self.query
+        d_metadata.record["id"] = item["@id"]
         self.metadata_records.append(d_metadata.record)
 
 
