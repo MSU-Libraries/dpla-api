@@ -1,5 +1,4 @@
-
-##DPLA API Interactions
+## DPLA API Interactions
 
 Code to interact with the DPLA API. Designed specifically to produce output suited to further, manual data entry, for eventual conversion to RDF according to the [Collex standard](http://wiki.collex.org/index.php/Main_Page).
 
