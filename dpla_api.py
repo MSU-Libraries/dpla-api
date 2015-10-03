@@ -79,6 +79,8 @@ class DplaApi():
         with codecs.open(output_path, "w", "UTF-8") as output_file:
             output_file.write(tsv_text)
 
+        print "Completed writing {0}".format(output_file)
+
 
     def return_marcxml(self):
         if self.result is None:
@@ -235,13 +237,15 @@ class DplaApi():
         d_metadata.record["thumbnail"] = item.get("object", "")
         d_metadata.record["seeAlso"] = item.get("isShownAt", "")
         if "provider" in item:
-            d_metadata.record["archive"] = item["provider"]["name"]
+            d_metadata.record["source"] = item["provider"]["name"]
         elif "dataProvider" in item:
-            d_metadata.record["archive"] = item["dataProvider"]
+            d_metadata.record["source"] = item["dataProvider"]
         else:
-            d_metadata.record["archive"] = ""
+            d_metadata.record["source"] = ""
         d_metadata.record["discipline"] = ""
         d_metadata.record["genre"] = ""
+        d_metadata.record["archive"] = ""
+        d_metadata.record["role"] = ""
         d_metadata.record["federation"] = "SiRO"
         d_metadata.record["original_query"] = self.query
         d_metadata.record["id"] = item["@id"]

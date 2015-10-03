@@ -61,6 +61,9 @@ class DplaMetadata():
 
             record["language"] = [lang["name"] for lang in self.metadata["language"]]
 
+        if "type" in self.metadata:
+            record["type"] = self.metadata["type"]
+
 
         self.record = record
 

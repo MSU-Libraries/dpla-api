@@ -1,3 +1,5 @@
+rdf/
+data/
 output/
 .ipynb_checkpoints/
 data/radicalism*
