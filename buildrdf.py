@@ -203,8 +203,9 @@ class BuildRdf():
 
         else:
             date_field = self.__add_subelement(self.siro_wrapper, "date", "dc")
-            rdf_date_label = self.__add_subelement(date_field, "label", "rdfs", field_value=date_label)
-            rdf_date_label = self.__add_subelement(date_field, "value", "rdf", field_value=date_value)
+            date_wrapper_field = self.__add_subelement(date_field, "date", "collex")
+            rdf_date_label = self.__add_subelement(date_wrapper_field, "label", "rdfs", field_value=date_label)
+            rdf_date_label = self.__add_subelement(date_wrapper_field, "value", "rdf", field_value=date_value)
 
 
     def __get_role(self):
