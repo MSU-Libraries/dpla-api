@@ -5,19 +5,19 @@ import re
 import codecs
 
 class BuildRdf():
-    """class to build RDF according to ARC standard."""
+    """Class to build RDF according to ARC standard."""
+
     def __init__(self):
         self.default_values = {
-                               "discipline":["History"],
-                               "role":["CRE"],
-                               "archive":["DPLA"],
-                               "genre":["Nonfiction"],
+                               "discipline": ["History"],
+                               "role": ["CRE"],
+                               "archive": ["dpla"],
+                               "genre": ["Nonfiction"],
         }
 
 
     def build_rdf_from_tsv(self, tsv_path, lines_to_process=None):
-        """
-        Initialize processing of tsv file. 
+        """Initialize processing of tsv file.
 
         args:
         tsv_path (str) -- path to tsv file.
@@ -39,18 +39,24 @@ class BuildRdf():
 
     def __read_tsv(self):
         """Open and read file."""
-        with open(self.tsv_path, "r") as tsv_file:
+        with codecs.open(self.tsv_path, "r", "utf-8") as tsv_file:
 
             if not self.lines_to_process:
-                self.lines_to_process = len(tsv_file)
+                self.lines_to_process = len(tsv_file.readlines())
+
+            print "Processing {0} records...".format(self.lines_to_process)
+
+            # The previous readlines() call moved the pointer to the end of the file, making iteration
+            # impossible. This line resets the pointer.
+            tsv_file.seek(0)
 
             # Skip first line (headings)
             self.headings = [h.strip() for h in tsv_file.readline().split("\t")]
-            lines_processed = 0
+            self.lines_processed = 0
             for line in tsv_file:
-                if self.lines_to_process > lines_processed:
+                if self.lines_to_process > self.lines_processed:
                     self.__process_line(line)
-                    lines_processed += 1
+                    self.lines_processed += 1
 
     def __process_line(self, line):
         """Process individual line of tsv file.
@@ -61,7 +67,9 @@ class BuildRdf():
         self.line_data = line.split("\t")
         self.line_reference = {}
         self.line_reference.update(zip(self.headings, self.line_data))
-        print "Processing {0} : {1}".format(self.line_reference["id"], self.line_reference["title"])
+        if self.lines_processed % 500 == 0:
+            print "Processed {0} records".format(self.lines_processed)
+        # print "{0} : {1}".format(self.line_reference["id"].encode("ascii", errors="ignore"), self.line_reference["title"].encode("ascii", errors="ignore"))
         self.__create_rdf()
 
     def __create_rdf(self):
@@ -85,7 +93,7 @@ class BuildRdf():
         # The triple-{} includes a literal "{}" and a {} that operates the format string.
         # That is, one escapes braces in a format string by doubling them.
         self.siro_wrapper = self.__add_subelement(self.rdf_root, "dpla", "sro", attributes={"{{{0}}}about".format(self.ns_map["rdf"]): self.line_reference["id"]})
-        federation = self.__add_subelement(self.siro_wrapper, "federation", "collex", field_value="SRO")
+        federation = self.__add_subelement(self.siro_wrapper, "federation", "collex", field_value="SiRO")
         
 
         for value in self.__get_values("archive"):
@@ -112,7 +120,7 @@ class BuildRdf():
         if self.line_reference["seeAlso"].strip():
             object_link = self.line_reference["seeAlso"]
         else:
-            object_id = os.path.basename(self.link_reference["id"])
+            object_id = os.path.basename(self.line_reference["id"])
             object_link = "http://dp.la/item/{0}".format(object_id)
 
         see_also = self.__add_subelement(self.siro_wrapper, "seeAlso", "rdfs", attributes={"{{{0}}}resource".format(self.ns_map["rdf"]): object_link})
@@ -120,10 +128,9 @@ class BuildRdf():
         if self.line_reference["thumbnail"].strip():
             thumbnail = self.__add_subelement(self.siro_wrapper, "thumbnail", "collex", attributes={"{{{0}}}resource".format(self.ns_map["rdf"]): self.line_reference["thumbnail"]})
 
-
-        print etree.tostring(self.rdf_root, pretty_print=True)
-        with codecs.open("rdf/{0}.xml".format(os.path.basename(self.line_reference["id"])), "w", "utf-8") as output_file:
-            output_file.write(etree.tostring(self.rdf_root, xml_declaration=True, encoding="UTF-8", pretty_print=True))
+        #print type(etree.tostring(self.rdf_root, xml_declaration=True, encoding="UTF-8", pretty_print=True))
+        with codecs.open("rdf/201603/{0}.xml".format(os.path.basename(self.line_reference["id"])), "w", "utf-8") as output_file:
+            output_file.write(etree.tostring(self.rdf_root, encoding="unicode", pretty_print=True))
 
 
     def __get_values(self, field):
@@ -141,7 +148,10 @@ class BuildRdf():
 
     def __add_creators(self):
         """Bring together roles and creators."""
-        self.creators = self.line_reference["creator"].split("|")
+        if self.line_reference["creator"].strip():
+            self.creators = self.line_reference["creator"].split("|")
+        else:
+            self.creators = ["Unknown"]
         self.role_type = self.__get_role()
         creator_roles = zip(self.role_type, self.creators)
         for creator in creator_roles:
@@ -150,10 +160,10 @@ class BuildRdf():
     def __add_genres(self):
         """Add genres from tsv, from default, or based on heuristic."""
         self.genres = []
-        letter_pattern = r'\[.*[Ll]etter.*\]'
+        self.letter_pattern = r'\[.*[Ll]etter.*\]'
 
 
-        if re.search(letter_pattern, self.line_reference["title"]):
+        if re.search(self.letter_pattern, self.line_reference["title"]):
             self.genres.append("Correspondence")
 
         self.genres += self.default_values["genre"]
@@ -170,9 +180,15 @@ class BuildRdf():
             record_type = "Manuscript"
 
         elif self.line_reference["type"] == "image":
-            record_type = "Still image"
+            record_type = "Still Image"
+
+        elif self.line_reference["type"] == "text" and re.search(self.letter_pattern, self.line_reference["title"]):
+            record_type = "Manuscript"
 
         elif self.line_reference["type"] == "text":
+            record_type = "Codex"
+
+        else:
             record_type = "Codex"
 
         rtype = self.__add_subelement(self.siro_wrapper, "type", "dc", field_value=record_type)
@@ -203,9 +219,11 @@ class BuildRdf():
 
         else:
             date_field = self.__add_subelement(self.siro_wrapper, "date", "dc")
-            rdf_date_label = self.__add_subelement(date_field, "label", "rdfs", field_value=date_label)
-            rdf_date_label = self.__add_subelement(date_field, "value", "rdf", field_value=date_value)
-
+            collex_date_wrapper = self.__add_subelement(date_field, "date", "collex")
+            rdf_date_label = self.__add_subelement(collex_date_wrapper,
+                                                   "label", "rdfs", field_value=date_label)
+            rdf_date_label = self.__add_subelement(collex_date_wrapper,
+                                                   "value", "rdf", field_value=date_value)
 
     def __get_role(self):
         """Check for role value in tsv data, use default if blank."""

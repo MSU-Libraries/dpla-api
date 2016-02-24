@@ -1,6 +1,6 @@
+"""Access DPLA api and work with data."""
 from __future__ import division
 from dpla.api import DPLA
-from pprint import pprint
 from lxml import etree
 import ConfigParser
 from metadpla import DplaMetadata
@@ -8,25 +8,31 @@ import codecs
 import time
 import json
 import math
+import os
 
 
 class DplaApi():
     """Interact with DPLA API using pre-acquired key."""
+
     def __init__(self):
-        self.dpla_key= self.__load_dpla_key()
+        """Load DPLA key and establish connection."""
+        self.dpla_key = self.__load_dpla_key()
         self.dpla = DPLA(self.dpla_key)
         self.result = None
         self.metadata_records = []
 
     def search(self, q_value, page_size=100):
+        """Run basic search query across DPLA.
+
+        args:
+            q_value (str) -- value to search
+        kwargs:
+            page_size (int) -- max number of results to request from DPLA.
+            (DPLA-imposed limit is 500)
         """
-        Run basic search query across DPLA.
-        q_value (str) -- value to search
-        page_size (int) -- max number of results to request from DPLA. (DPLA-imposed limit is 500)
-        """
-        self.query = q_value
-        print "Query: {0}".format(self.query)
+        self.query = q_value.strip().replace(",", "").replace("(", "").replace(")", "")
         self.result = self.dpla.search(q=q_value, page_size=page_size)
+        print "Query: '{0}' returned {1} results".format(self.query, self.result.count)
         time.sleep(.5)
         self.all_returned_items = self.result.items
         if self.result.count > self.result.limit:
@@ -37,50 +43,165 @@ class DplaApi():
                 self.all_returned_items += self.result.items
                 time.sleep(.5)
 
-        
+    def build_arc_rdf_dataset(self, check_match=True, disciplines=""):
+        """Iterate over search results and pull necessary elements to create ARC RDF.
 
-
-    def build_arc_rdf_dataset(self, check_match=True):
-        """Iterate over search results and pull necessary elements to create ARC RDF, storing them in a list of python dictionaries."""
-
+        Store results in a list of python dictionaries.
+        kwargs:
+            check_match(bool): check if RDF for item has already been created.
+            disciplines(str): string of "|"-separated values.
+        """
+        self.disciplines = disciplines
         if check_match:
             self.__load_match_data()
 
-        print "Query '{0}' returned {1} records (Check: {2} records transferred)".format(self.query, self.result.count, len(self.all_returned_items))
-
+        print "----Check: {0} records transferred"\
+              .format(len(self.all_returned_items))
+        rdf_matches = 0
+        new_records = 0
         for item in self.all_returned_items:
-
             if check_match:
-                if item["@id"] in self.existing_records:
-                    pass
+                if os.path.basename(item["@id"]) in self.existing_records:
+                    rdf_matches += 1
                 else:
                     self.__process_metadata(item)
                     self.existing_records.append(item["@id"])
+                    new_records += 1
 
             else:
                 self.__process_metadata(item)
 
-        
+        print "----Found: {0} existing RDF records".format(rdf_matches)
+        print "----Saved: {0} new metadata records".format(new_records)
+        self._store_match_data()
 
-    def create_tsv(self, output_path="data/radicalism-all-dpla.tsv"):
-        """Build CSV file for ARC pre-RDF dataset."""
-        tsv_text = ""
-        headings = "\t".join(self.metadata_records[0].keys())
-        tsv_text += headings + "\n"
-        for record in self.metadata_records:
+    def create_tsv(self, records=None,
+                   output_path="data/radicalism-dpla-201603.tsv"):
+        """Build TSV file for ARC pre-RDF dataset.
+
+        kwargs:
+            records(list): by default, the results created from the current search.
+        """
+        if not records:
+            records = self.metadata_records
+        tsv_lines = []
+        headings = "\t".join(records[0].keys())
+        headings += "\n"
+        tsv_lines.append(headings)
+        for record in records:
+            line = ""
             for key, value in record.items():
                 if isinstance(value, list):
-                    tsv_text += " | ".join(value) 
+                    line += " | ".join([v.replace("\t", " ") for v in value if v is not None])
                 else:
-                    tsv_text += value
-                tsv_text += "\t"
-            tsv_text += "\n"
+                    line += value.replace("\t", " ")
+                line += "\t"
+            line += "\n"
+            tsv_lines.append(line)
 
         with codecs.open(output_path, "w", "UTF-8") as output_file:
-            output_file.write(tsv_text)
+            for line in tsv_lines:
+                output_file.write(line)
 
-        print "Completed writing {0}".format(output_file)
+        print "Completed writing {0}".format(output_path)
 
+    def update_rdf_registry(self, rdf_dir="rdf", reset_matches=False):
+        """Update listings of already-processed items.
+
+        kwargs:
+            rdf_dir(str): directory in which to find rdf.
+            reset_matches(bool): reset match list and rebuild from scratch,
+                based entirely on RDF files present in specified dir. Any
+                records added to the registry through querying will be removed.
+        """
+        self.__load_match_data(reset_match_file=reset_matches)
+        update_count = 0
+        match_count = 0
+        for root, dirs, files in os.walk(rdf_dir):
+            for f in files:
+                if f.endswith(".xml"):
+                    root_name = os.path.splitext(f)[0]
+                    if root_name not in self.existing_records:
+                        self.existing_records.append(root_name)
+                        update_count += 1
+                    else:
+                        match_count += 1
+        print "Matching records: {0}".format(match_count)
+        print "New records: {0}".format(update_count)
+        self._store_match_data()
+
+    def _store_match_data(self):
+        """Store updated processed item list."""
+        with open(self.match_file, "w") as match_file:
+            json.dump(self.existing_records, match_file)
+
+    def __load_dpla_key(self):
+        """Load DPLA API Key from config file."""
+        config = ConfigParser.RawConfigParser()
+        config.read("default.cfg")
+        return config.get("dpla_api", "api_key")
+
+    def __load_match_data(self, reset_match_file=False):
+        """Prepare data on previous search results."""
+        self.match_file = self.__load_match_settings()
+        if reset_match_file is True:
+            self.existing_records = []
+        else:
+            self.existing_records = json.load(open(self.match_file, "r"))
+
+    def __load_match_settings(self):
+        """Load file containing list of all previously processed items."""
+        config = ConfigParser.RawConfigParser()
+        config.read("default.cfg")
+        return config.get("check_match", "match_file")
+
+    def __process_metadata(self, item):
+        """Process metadata from JSON DPLA record, pulling descriptive elements from the 'sourceResource' fields.
+
+        Positional arguments:
+        item (dict) -- Python dictionary from JSON results of DPLA search.
+        """
+        d_metadata = DplaMetadata(item["sourceResource"])
+        d_metadata.compile()
+        d_metadata.record["thumbnail"] = item.get("object", "")
+        d_metadata.record["seeAlso"] = item.get("isShownAt", "")
+        if "provider" in item:
+            d_metadata.record["source"] = item["provider"]["name"]
+        elif "dataProvider" in item:
+            d_metadata.record["source"] = item["dataProvider"]
+        else:
+            d_metadata.record["source"] = ""
+        d_metadata.record["discipline"] = self.disciplines
+        d_metadata.record["genre"] = ""
+        d_metadata.record["archive"] = ""
+        d_metadata.record["role"] = ""
+        d_metadata.record["federation"] = "SiRO"
+        d_metadata.record["original_query"] = self.query
+        d_metadata.record["id"] = item["@id"]
+        self.metadata_records.append(d_metadata.record)
+
+    # Not using these anymore, might not work.
+    def return_html(self, filepath="dpla.html"):
+        with open(filepath, "w") as f:
+            f.write("<table border='1' style='100%'>")
+            f.write("<tr>")
+            f.write("<td>Title</td>")
+            f.write("<td>Link</td>")
+            f.write("</tr>")
+            for item in result.items:
+                title = item["sourceResource"]["title"]
+                url = unicode(item["isShownAt"])
+                if isinstance(title, list):
+                    title_clean = unicode(title[0])
+
+                else:
+                    title_clean = unicode(title)
+
+                f.write("<tr>")
+                f.write("<td>"+title_clean.encode("UTF-8")+"</td>")
+                f.write("<td><a href='"+url+"'>"+url+"</td>")
+                f.write("<tr>")
+            f.write("</table>")
 
     def return_marcxml(self):
         if self.result is None:
@@ -183,73 +304,4 @@ class DplaApi():
                     subfield = etree.SubElement(datafield,"subfield",code=sub_row.code)
                     subfield.text = sub_row.content
         """
-
-    def return_html(self, filepath="dpla.html"):
-        with open(filepath, "w") as f:
-            f.write("<table border='1' style='100%'>")
-            f.write("<tr>")
-            f.write("<td>Title</td>")
-            f.write("<td>Link</td>")
-            f.write("</tr>")
-            for item in result.items:
-                title = item["sourceResource"]["title"]
-                url = unicode(item["isShownAt"])
-                if isinstance(title, list):
-                    title_clean = unicode(title[0])
-
-                else:
-                    title_clean = unicode(title)
-
-                f.write("<tr>")
-                f.write("<td>"+title_clean.encode("UTF-8")+"</td>")
-                f.write("<td><a href='"+url+"'>"+url+"</td>")
-                f.write("<tr>")
-            f.write("</table>")
-
-    def __load_dpla_key(self):
-        """Load DPLA API Key from config file."""
-        config = ConfigParser.RawConfigParser()
-        config.read("default.cfg")
-        return config.get("dpla_api", "api_key")
-
-    def __load_match_data(self):
-        """Prepare data on previous search results."""
-        match_file, reset_match_file = self.__load_match_settings()
-        if reset_match_file == "true":
-            self.existing_records = []
-        else:
-            self.existing_records = json.load(open(match_file, "r"))
-
-    def __load_match_settings(self):
-        """Load file containing list of all previously processed items."""
-        config = ConfigParser.RawConfigParser()
-        config.read("default.cfg")
-        return config.get("check_match", "match_file"), config.get("check_match", "reset_match_file")
-
-    def __process_metadata(self, item):
-        """Process metadata from JSON DPLA record, pulling descriptive elements from the 'sourceResource' fields.
-
-        Positional arguments:
-        item (dict) -- Python dictionary from JSON results of DPLA search.
-        """
-        d_metadata = DplaMetadata(item["sourceResource"])
-        d_metadata.compile()
-        d_metadata.record["thumbnail"] = item.get("object", "")
-        d_metadata.record["seeAlso"] = item.get("isShownAt", "")
-        if "provider" in item:
-            d_metadata.record["source"] = item["provider"]["name"]
-        elif "dataProvider" in item:
-            d_metadata.record["source"] = item["dataProvider"]
-        else:
-            d_metadata.record["source"] = ""
-        d_metadata.record["discipline"] = ""
-        d_metadata.record["genre"] = ""
-        d_metadata.record["archive"] = ""
-        d_metadata.record["role"] = ""
-        d_metadata.record["federation"] = "SiRO"
-        d_metadata.record["original_query"] = self.query
-        d_metadata.record["id"] = item["@id"]
-        self.metadata_records.append(d_metadata.record)
-
-
 
