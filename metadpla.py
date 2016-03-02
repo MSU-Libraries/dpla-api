@@ -1,10 +1,11 @@
+"""Assess and extract from DPLA metadata."""
 
 
 class DplaMetadata():
+    """DPLA metadata class."""
 
     def __init__(self, dpla_metadata):
-        """
-        Initialize object containing just the DPLA-level metadata (not from original record).
+        """Initialize object containing just the DPLA-level metadata (not from original record).
 
         Positional arguments:
         dpla_metadata (dict) -- object of "sourceResource"-level metadata. See dpla_sample_metadata.json for details.
@@ -15,18 +16,17 @@ class DplaMetadata():
         """Pull relevant metadata for ARC record, and record fields not found."""
         record = {
 
-                        "date":"",
-                        "title":"",
-                        "subjects":[],
-                        "type":[],
-                        "creator":[],
-                        "language":[],
+                        "date": "",
+                        "title": "",
+                        "subjects": [],
+                        "type": [],
+                        "creator": [],
+                        "language": [],
                     }
-        
 
         if "date" in self.metadata:
             if isinstance(self.metadata["date"], list):
-                
+
                 if "displayDate" in self.metadata["date"][0]:
                     record["date"] = self.metadata["date"][0]["displayDate"]
                 elif "begin" in self.metadata["date"][0]:
@@ -64,10 +64,4 @@ class DplaMetadata():
         if "type" in self.metadata:
             record["type"] = self.metadata["type"]
 
-
         self.record = record
-
-
-
-
-

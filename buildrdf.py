@@ -1,20 +1,21 @@
+"""Build individual RDF XML records from spreadsheet rows."""
 import os
 from lxml import etree
-from pprint import pprint
 import re
 import codecs
+
 
 class BuildRdf():
     """Class to build RDF according to ARC standard."""
 
     def __init__(self):
+        """Load default values."""
         self.default_values = {
                                "discipline": ["History"],
                                "role": ["CRE"],
                                "archive": ["dpla"],
                                "genre": ["Nonfiction"],
         }
-
 
     def build_rdf_from_tsv(self, tsv_path, lines_to_process=None):
         """Initialize processing of tsv file.
@@ -26,11 +27,12 @@ class BuildRdf():
         self.lines_to_process = lines_to_process
         self.tsv_path = tsv_path
 
-        #Array of columns in the order they appear in the standard pre-RDF tsv file.
+        # Array of columns in the order they appear in the standard pre-RDF tsv file.
+        """
         column_alignment = ["discipline", "federation", "language", "creator", "id"
                             "title", "archive", "genre", "original_query", "subjects",
                             "date", "type", "thumbnail", "seeAlso"]
-
+        """
         if self.__check_file():
             self.__read_tsv()
 
@@ -60,7 +62,7 @@ class BuildRdf():
 
     def __process_line(self, line):
         """Process individual line of tsv file.
-        
+
         args:
         line (str) -- single line from tsv file.
         """
@@ -159,18 +161,19 @@ class BuildRdf():
         
     def __add_genres(self):
         """Add genres from tsv, from default, or based on heuristic."""
-        self.genres = []
+        if self.line_reference["genre"] == "none":
+            self.genres = []
+        else:
+            self.genres = [self.line_reference["genre"]]
+
         self.letter_pattern = r'\[.*[Ll]etter.*\]'
-
-
         if re.search(self.letter_pattern, self.line_reference["title"]):
             self.genres.append("Correspondence")
 
         self.genres += self.default_values["genre"]
 
-        for genre in self.genres:
+        for genre in set(self.genres):
             genre_field = self.__add_subelement(self.siro_wrapper, "genre", "collex", field_value=genre)
-
 
     def __add_type(self):
         """Find 1 type for each item."""

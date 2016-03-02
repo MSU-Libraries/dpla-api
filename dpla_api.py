@@ -172,13 +172,53 @@ class DplaApi():
         else:
             d_metadata.record["source"] = ""
         d_metadata.record["discipline"] = self.disciplines
-        d_metadata.record["genre"] = ""
+        d_metadata.record["genre"] = self._get_genre_from_marc(item)
         d_metadata.record["archive"] = ""
         d_metadata.record["role"] = ""
         d_metadata.record["federation"] = "SiRO"
         d_metadata.record["original_query"] = self.query
         d_metadata.record["id"] = item["@id"]
         self.metadata_records.append(d_metadata.record)
+
+    def _get_genre_from_marc(self, item):
+        """Check for 'literary form' value in MARC record.
+
+        args:
+            item (dict): Python dictionary from JSON results of DPLA search.
+        returns:
+            (str) genre value(s) to include in output.
+        """
+        genre_value = "none"
+        value_map = {"0": "Nonfiction",
+                     "1": "Fiction",
+                     "d": "Drama",
+                     "e": "Nonfiction",
+                     "f": "Fiction",
+                     "i": "Correspondence",
+                     "j": "Fiction",
+                     "p": "Poetry"
+                     }
+        if self._marc_record(item):
+            for field in item["originalRecord"]["controlfield"]:
+                if field["tag"] == "008" and len(field["#text"]) > 33:
+                    genre = field["#text"][33]
+                    genre_value = value_map.get(genre, "")
+        return genre_value
+
+
+    def _marc_record(self, item):
+        """Check if item contains a MARC record.
+
+        args:
+            item(dict): Python dictionary from JSON results of DPLA search.
+        returns:
+            is_marc(bool): true if item contains a marc record, false otherwise.
+        """
+        is_marc = False
+        if "originalRecord" in item:
+            if "contolfield" in item["originalRecord"]:
+                is_marc = True
+        return is_marc
 
     # Not using these anymore, might not work.
     def return_html(self, filepath="dpla.html"):
