@@ -158,7 +158,7 @@ class BuildRdf():
         creator_roles = zip(self.role_type, self.creators)
         for creator in creator_roles:
             role = self.__add_subelement(self.siro_wrapper, creator[0], "role", field_value=creator[1].strip())
-        
+
     def __add_genres(self):
         """Add genres from tsv, from default, or based on heuristic."""
         if self.line_reference["genre"] == "none":
@@ -170,7 +170,8 @@ class BuildRdf():
         if re.search(self.letter_pattern, self.line_reference["title"]):
             self.genres.append("Correspondence")
 
-        self.genres += self.default_values["genre"]
+        if len(self.genres) == 0:
+            self.genres += self.default_values["genre"]
 
         for genre in set(self.genres):
             genre_field = self.__add_subelement(self.siro_wrapper, "genre", "collex", field_value=genre)
@@ -205,10 +206,10 @@ class BuildRdf():
 
         if re.search(r'^[0-9]{4}$', date):
             dcdate = date
-        
+
         elif matches:
             date_label = date
-            date_value = ",".join(matches)
+            date_value = ",".join([min(matches), max(matches)])
 
         elif date.strip():
             date_label = date

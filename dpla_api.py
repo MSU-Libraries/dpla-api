@@ -4,6 +4,7 @@ from dpla.api import DPLA
 from lxml import etree
 import ConfigParser
 from metadpla import DplaMetadata
+from hathi import HathiBibApi
 import codecs
 import time
 import json
@@ -198,13 +199,49 @@ class DplaApi():
                      "j": "Fiction",
                      "p": "Poetry"
                      }
+        """
+        This method could be used with DPLA-returned MARC info, if the spacing
+        of the 008 field was preserved.
         if self._marc_record(item):
             for field in item["originalRecord"]["controlfield"]:
                 if field["tag"] == "008" and len(field["#text"]) > 33:
                     genre = field["#text"][33]
                     genre_value = value_map.get(genre, "")
+        """
+        # Access bibliographic information via the HathiTrust API.
+        if "hathitrust" in item.get("isShownAt", ""):
+            record = self._get_hathi_record(item)
+            # print record
+            marc_string = record["records"][str(self.hathi_id)]["marc-xml"]
+            genre = self._extract_genre(marc_string)
+            genre_value = value_map.get(genre, "")
+
         return genre_value
 
+    def _extract_genre(self, marc_string):
+        """Extract appropriate byte-mark in 008 to indicate genre.
+
+        args:
+            marc_string(str): marc xml as string.
+        """
+        path_008 = "/collection/record/controlfield[@tag='008']"
+        tree = etree.fromstring(marc_string.encode("utf-8"))
+        text_008 = tree.xpath(path_008)[0].text
+        if len(text_008) > 33:
+            genre = text_008[33]
+        else:
+            genre = "null"
+        return genre
+
+    def _get_hathi_record(self, item):
+        """Get HathiTrust record.
+
+        args:
+            item (dict): Python dictionary from JSON results of DPLA search.
+        """
+        self.hathi_id = item["originalRecord"]["_id"]
+        hbi = HathiBibApi()
+        return hbi.get_record(self.hathi_id)
 
     def _marc_record(self, item):
         """Check if item contains a MARC record.
@@ -216,7 +253,7 @@ class DplaApi():
         """
         is_marc = False
         if "originalRecord" in item:
-            if "contolfield" in item["originalRecord"]:
+            if "controlfield" in item["originalRecord"]:
                 is_marc = True
         return is_marc
 
