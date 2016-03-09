@@ -84,7 +84,7 @@ Output of the above code, including full RDF record:
 ---
 
 
-Code below used to load a list of thousands of search and run them all in sequence, before storing the results in a tsv file.
+Code below used to load a list of thousands of searches and run them all in sequence, before storing the results in a tsv file.
 
     from dpla_api import DplaApi
     da = DplaApi()
