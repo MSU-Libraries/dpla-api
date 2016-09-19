@@ -11,10 +11,10 @@ class BuildRdf():
     def __init__(self):
         """Load default values."""
         self.default_values = {
-                               "discipline": ["History"],
-                               "role": ["CRE"],
-                               "archive": ["dpla"],
-                               "genre": ["Nonfiction"],
+            "discipline": ["History"],
+            "role": ["CRE"],
+            "archive": ["dpla"],
+            "genre": ["Nonfiction"],
         }
 
     def build_rdf_from_tsv(self, tsv_path, lines_to_process=None):

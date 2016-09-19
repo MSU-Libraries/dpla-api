@@ -157,7 +157,8 @@ class DplaApi():
         return config.get("check_match", "match_file")
 
     def __process_metadata(self, item):
-        """Process metadata from JSON DPLA record, pulling descriptive elements from the 'sourceResource' fields.
+        """Process metadata from JSON DPLA record, pulling descriptive
+        elements from the 'sourceResource' fields.
 
         Positional arguments:
         item (dict) -- Python dictionary from JSON results of DPLA search.
