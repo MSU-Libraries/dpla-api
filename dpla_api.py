@@ -88,12 +88,16 @@ class DplaApi():
         tsv_lines = []
         headings = "\t".join(records[0].keys())
         headings += "\n"
+        lists = 0
         tsv_lines.append(headings)
         for record in records:
             line = ""
             for key, value in record.items():
                 if isinstance(value, list):
-                    line += " | ".join([v.replace("\t", " ") for v in value if v is not None])
+                    if any(isinstance(v, list) for v in value):
+                        lists += 1
+                    else:
+                        line += " | ".join([v.replace("\t", " ") for v in value if v is not None])
                 else:
                     line += value.replace("\t", " ")
                 line += "\t"
@@ -105,6 +109,7 @@ class DplaApi():
                 output_file.write(line)
 
         print "Completed writing {0}".format(output_path)
+        print lists
 
     def update_rdf_registry(self, rdf_dir="rdf", reset_matches=False):
         """Update listings of already-processed items.
