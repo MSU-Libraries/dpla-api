@@ -131,7 +131,7 @@ class BuildRdf():
             thumbnail = self.__add_subelement(self.siro_wrapper, "thumbnail", "collex", attributes={"{{{0}}}resource".format(self.ns_map["rdf"]): self.line_reference["thumbnail"]})
 
         #print type(etree.tostring(self.rdf_root, xml_declaration=True, encoding="UTF-8", pretty_print=True))
-        with codecs.open("rdf/201603/{0}.xml".format(os.path.basename(self.line_reference["id"])), "w", "utf-8") as output_file:
+        with codecs.open("rdf/20170616/{0}.xml".format(os.path.basename(self.line_reference["id"])), "w", "utf-8") as output_file:
             output_file.write(etree.tostring(self.rdf_root, encoding="unicode", pretty_print=True))
 
 

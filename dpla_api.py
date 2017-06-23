@@ -44,7 +44,7 @@ class DplaApi():
                 self.all_returned_items += self.result.items
                 time.sleep(.5)
 
-    def build_arc_rdf_dataset(self, check_match=True, disciplines=""):
+    def build_arc_rdf_dataset(self, check_match=True, disciplines="", id_match=None):
         """Iterate over search results and pull necessary elements to create ARC RDF.
 
         Store results in a list of python dictionaries.
@@ -53,6 +53,7 @@ class DplaApi():
             disciplines(str): string of "|"-separated values.
         """
         self.disciplines = disciplines
+        self.id_match = id_match
         if check_match:
             self.__load_match_data()
 
@@ -179,13 +180,18 @@ class DplaApi():
         else:
             d_metadata.record["source"] = ""
         d_metadata.record["discipline"] = self.disciplines
-        d_metadata.record["genre"] = self._get_genre_from_marc(item)
+        # d_metadata.record["genre"] = self._get_genre_from_marc(item)
+        d_metadata.record["genre"] = "none"
         d_metadata.record["archive"] = ""
         d_metadata.record["role"] = ""
         d_metadata.record["federation"] = "SiRO"
         d_metadata.record["original_query"] = self.query
         d_metadata.record["id"] = item["@id"]
-        self.metadata_records.append(d_metadata.record)
+        if self.id_match:
+            if self.id_match in d_metadata.record["seeAlso"]:
+                self.metadata_records.append(d_metadata.record)
+        else:
+            self.metadata_records.append(d_metadata.record)
 
     def _get_genre_from_marc(self, item):
         """Check for 'literary form' value in MARC record.
