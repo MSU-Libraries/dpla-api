@@ -73,12 +73,13 @@ class DplaApi():
             else:
                 self.__process_metadata(item)
 
-        print "----Found: {0} existing RDF records".format(rdf_matches)
-        print "----Saved: {0} new metadata records".format(new_records)
+        # print "----Found: {0} existing RDF records".format(rdf_matches)
+        # print "----Saved: {0} new metadata records".format(new_records)
+        self.__load_match_data(reset_match_file=True)
         self._store_match_data()
 
     def create_tsv(self, records=None,
-                   output_path="data/radicalism-dpla-201603.tsv"):
+                   output_path="data/radicalism-dpla.tsv"):
         """Build TSV file for ARC pre-RDF dataset.
 
         kwargs:
@@ -110,7 +111,6 @@ class DplaApi():
                 output_file.write(line)
 
         print "Completed writing {0}".format(output_path)
-        print lists
 
     def update_rdf_registry(self, rdf_dir="rdf", reset_matches=False):
         """Update listings of already-processed items.
