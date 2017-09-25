@@ -36,7 +36,7 @@ class DplaApi():
             self.result = self.dpla.search(q=q_value, page_size=page_size)
         elif isinstance(q_value, dict):
             self.query = q_value
-            self.result = self.dpla.search(searchFields=q_value)
+            self.result = self.dpla.search(searchFields=q_value, page_size=page_size)
 
         print "Query: '{0}' returned {1} results".format(self.query, self.result.count)
         time.sleep(.5)
@@ -105,8 +105,11 @@ class DplaApi():
                         lists += 1
                     else:
                         line += " | ".join([v.replace("\t", " ") for v in value if v is not None])
-                else:
+                elif isinstance(value, str):
                     line += value.replace("\t", " ")
+                else:
+                    value_str = json.dumps(value)
+                    line += value_str
                 line += "\t"
             line += "\n"
             tsv_lines.append(line)
