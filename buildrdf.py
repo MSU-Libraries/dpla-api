@@ -15,26 +15,41 @@ class BuildRdf():
             "role": ["CRE"],
             "archive": ["dpla"],
             "genre": ["Nonfiction"],
+            "freeculture": ["TRUE"]
+        }
+        self.ns_map = {
+            "rdf":"http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+            "role":"http://www.loc.gov/loc.terms/relators/",
+            "rdfs":"http://www.w3.org/2000/01/rdf-schema#",
+            "collex":"http://www.collex.org/schema#",
+            "dcterms":"http://purl.org/dc/terms/",
+            "dc":"http://purl.org/dc/elements/1.1/",
+            "sro":"http://www.lib.msu.edu/sro/schema#",
         }
 
-    def build_rdf_from_tsv(self, tsv_path, lines_to_process=None):
+    def build_rdf_from_tsv(self, tsv_path, output_path, lines_to_process=None):
         """Initialize processing of tsv file.
 
         args:
         tsv_path (str) -- path to tsv file.
         lines_to_process (int) -- allow user to determine number of lines in tsv to process.
         """
+        self.output_path = output_path
         self.lines_to_process = lines_to_process
         self.tsv_path = tsv_path
 
         # Array of columns in the order they appear in the standard pre-RDF tsv file.
         """
         column_alignment = ["discipline", "federation", "language", "creator", "id"
-                            "title", "archive", "genre", "original_query", "subjects",
+                            "title", "archive", "genre", "freeculture", "original_query", "subjects",
                             "date", "type", "thumbnail", "seeAlso"]
         """
+        self.rdf_root = etree.Element("{{{0}}}RDF".format(self.ns_map["rdf"]), nsmap=self.ns_map)
+
         if self.__check_file():
-            self.__read_tsv()
+            rdf = self.__read_tsv()
+            with codecs.open(self.output_path, "w", "utf-8") as output_file:
+                output_file.write(etree.tostring(self.rdf_root, encoding="unicode", pretty_print=True))
 
         else:
             print "Invalid path -- File Doesn't Exist: {0}".format(self.tsv_path)
@@ -57,8 +72,10 @@ class BuildRdf():
             self.lines_processed = 0
             for line in tsv_file:
                 if self.lines_to_process > self.lines_processed:
-                    self.__process_line(line)
+                    rdf = self.__process_line(line)
+                    add_record = self.rdf_root.append(rdf)
                     self.lines_processed += 1
+
 
     def __process_line(self, line):
         """Process individual line of tsv file.
@@ -72,31 +89,32 @@ class BuildRdf():
         if self.lines_processed % 500 == 0:
             print "Processed {0} records".format(self.lines_processed)
         # print "{0} : {1}".format(self.line_reference["id"].encode("ascii", errors="ignore"), self.line_reference["title"].encode("ascii", errors="ignore"))
-        self.__create_rdf()
+        return self.__create_rdf()
 
     def __create_rdf(self):
         """Start RDF creation."""
 
         self.ns_map = {
-                    "rdf":"http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-                    "role":"http://www.loc.gov/loc.terms/relators/",
-                    "rdfs":"http://www.w3.org/2000/01/rdf-schema#",
-                    "collex":"http://www.collex.org/schema#",
-                    "dcterms":"http://purl.org/dc/terms/",
-                    "dc":"http://purl.org/dc/elements/1.1/",
-                    "sro":"http://www.lib.msu.edu/sro/schema#",
-                    }
+            "rdf":"http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+            "role":"http://www.loc.gov/loc.terms/relators/",
+            "rdfs":"http://www.w3.org/2000/01/rdf-schema#",
+            "collex":"http://www.collex.org/schema#",
+            "dcterms":"http://purl.org/dc/terms/",
+            "dc":"http://purl.org/dc/elements/1.1/",
+            "sro":"http://www.lib.msu.edu/sro/schema#",
+        }
 
-        self.rdf_root = etree.Element("{{{0}}}RDF".format(self.ns_map["rdf"]), nsmap=self.ns_map)
-        self.__process_elements()
+        # self.rdf_root = etree.Element("{{{0}}}RDF".format(self.ns_map["rdf"]), nsmap=self.ns_map)
+        return self.__process_elements()
 
     def __process_elements(self):
         """Process data into RDF."""
         # The triple-{} includes a literal "{}" and a {} that operates the format string.
         # That is, one escapes braces in a format string by doubling them.
-        self.siro_wrapper = self.__add_subelement(self.rdf_root, "dpla", "sro", attributes={"{{{0}}}about".format(self.ns_map["rdf"]): self.line_reference["id"]})
+        self.siro_wrapper = etree.Element("{{{0}}}dpla".format(self.ns_map["sro"]))
+        siro_wrapper_attribute = "{{{0}}}about".format(self.ns_map["rdf"])
+        self.siro_wrapper.attrib[siro_wrapper_attribute] = self.line_reference["id"]
         federation = self.__add_subelement(self.siro_wrapper, "federation", "collex", field_value="SiRO")
-        
 
         for value in self.__get_values("archive"):
             archive = self.__add_subelement(self.siro_wrapper, "archive", "collex", field_value=value)
@@ -112,6 +130,7 @@ class BuildRdf():
             archive = self.__add_subelement(self.siro_wrapper, "discipline", "collex", field_value=value)
         
         self.__add_genres()
+        self.__add_freecultures()
         self.__add_type()
         self.__add_date()
 
@@ -120,7 +139,7 @@ class BuildRdf():
             language = self.__add_subelement(self.siro_wrapper, "language", "dc", field_value=self.line_reference["language"])
         
         if self.line_reference["seeAlso"].strip():
-            object_link = self.line_reference["seeAlso"]
+            object_link = self.line_reference["seeAlso"].strip()
         else:
             object_id = os.path.basename(self.line_reference["id"])
             object_link = "http://dp.la/item/{0}".format(object_id)
@@ -130,10 +149,11 @@ class BuildRdf():
         if self.line_reference["thumbnail"].strip():
             thumbnail = self.__add_subelement(self.siro_wrapper, "thumbnail", "collex", attributes={"{{{0}}}resource".format(self.ns_map["rdf"]): self.line_reference["thumbnail"]})
 
-        #print type(etree.tostring(self.rdf_root, xml_declaration=True, encoding="UTF-8", pretty_print=True))
+        return self.siro_wrapper
+        """
         with codecs.open("rdf/20170616/{0}.xml".format(os.path.basename(self.line_reference["id"])), "w", "utf-8") as output_file:
             output_file.write(etree.tostring(self.rdf_root, encoding="unicode", pretty_print=True))
-
+        """
 
     def __get_values(self, field):
         """
@@ -196,6 +216,18 @@ class BuildRdf():
             record_type = "Codex"
 
         rtype = self.__add_subelement(self.siro_wrapper, "type", "dc", field_value=record_type)
+
+    def __add_freecultures(self):
+        # Generate freeculture field.
+        
+        if self.line_reference["freeculture"] == "":
+            self.freecultures = ["TRUE"]
+            
+        else:
+            self.freecultures = [self.line_reference["freeculture"]]
+            
+        for freeculture in set(self.freecultures):
+            freeculture_field = self.__add_subelement(self.siro_wrapper, "freeculture", "collex", field_value=freeculture)
 
     def __add_date(self):
         """Heuristic for date handling."""
