@@ -22,7 +22,7 @@ class DplaApi():
         self.result = None
         self.metadata_records = []
 
-    def search(self, q_value, page_size=100):
+    def search(self, q_value, page_size=100, fields=[]):
         """Run basic search query across DPLA.
 
         args:
@@ -36,7 +36,7 @@ class DplaApi():
             self.result = self.dpla.search(q=q_value, page_size=page_size)
         elif isinstance(q_value, dict):
             self.query = q_value
-            self.result = self.dpla.search(searchFields=q_value, page_size=page_size)
+            self.result = self.dpla.search(searchFields=q_value, page_size=page_size, fields=fields)
 
         print "Query: '{0}' returned {1} results".format(self.query, self.result.count)
         time.sleep(.5)

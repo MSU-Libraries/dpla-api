@@ -49,7 +49,7 @@ class DplaMetadata():
                 record["title"] = self.metadata["title"]
 
         if "subject" in self.metadata:
-            record["subjects"] = [subject["name"] for subject in self.metadata["subject"]]
+            record["subjects"] = [subject["name"] for subject in self.metadata["subject"] if "name" in subject]
 
         if "specType" in self.metadata:
             record["type"] = self.metadata["specType"]
