@@ -14,17 +14,17 @@ class BuildRdf():
             "discipline": ["History"],
             "role": ["CRE"],
             "archive": ["dpla"],
-            "genre": ["Nonfiction"],
+            "genre": ["Unspecified"],
             "freeculture": ["TRUE"]
         }
         self.ns_map = {
-            "rdf":"http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-            "role":"http://www.loc.gov/loc.terms/relators/",
-            "rdfs":"http://www.w3.org/2000/01/rdf-schema#",
-            "collex":"http://www.collex.org/schema#",
-            "dcterms":"http://purl.org/dc/terms/",
-            "dc":"http://purl.org/dc/elements/1.1/",
-            "sro":"http://www.lib.msu.edu/sro/schema#",
+            "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+            "role": "http://www.loc.gov/loc.terms/relators/",
+            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+            "collex": "http://www.collex.org/schema#",
+            "dcterms": "http://purl.org/dc/terms/",
+            "dc": "http://purl.org/dc/elements/1.1/",
+            "sro": "http://www.lib.msu.edu/sro/schema#",
         }
 
     def build_rdf_from_tsv(self, tsv_path, output_path, lines_to_process=None):
@@ -73,9 +73,8 @@ class BuildRdf():
             for line in tsv_file:
                 if self.lines_to_process > self.lines_processed:
                     rdf = self.__process_line(line)
-                    add_record = self.rdf_root.append(rdf)
+                    self.rdf_root.append(rdf)
                     self.lines_processed += 1
-
 
     def __process_line(self, line):
         """Process individual line of tsv file.
@@ -88,7 +87,12 @@ class BuildRdf():
         self.line_reference.update(zip(self.headings, self.line_data))
         if self.lines_processed % 500 == 0:
             print "Processed {0} records".format(self.lines_processed)
-        # print "{0} : {1}".format(self.line_reference["id"].encode("ascii", errors="ignore"), self.line_reference["title"].encode("ascii", errors="ignore"))
+        """
+        print "{0} : {1}".format(
+            self.line_reference["id"].encode("ascii", errors="ignore"),
+            self.line_reference["title"].encode("ascii", errors="ignore"))
+        """
+
         return self.__create_rdf()
 
     def __create_rdf(self):
@@ -177,14 +181,14 @@ class BuildRdf():
         self.role_type = self.__get_role()
         creator_roles = zip(self.role_type, self.creators)
         for creator in creator_roles:
-            role = self.__add_subelement(self.siro_wrapper, creator[0], "role", field_value=creator[1].strip())
+            self.__add_subelement(self.siro_wrapper, creator[0], "role", field_value=creator[1].strip())
 
     def __add_genres(self):
         """Add genres from tsv, from default, or based on heuristic."""
         if self.line_reference["genre"] == "none":
             self.genres = []
         else:
-            self.genres = [self.line_reference["genre"]]
+            self.genres = [self.line_reference["genre"].title()]
 
         self.letter_pattern = r'\[.*[Ll]etter.*\]'
         if re.search(self.letter_pattern, self.line_reference["title"]):
@@ -194,7 +198,7 @@ class BuildRdf():
             self.genres += self.default_values["genre"]
 
         for genre in set(self.genres):
-            genre_field = self.__add_subelement(self.siro_wrapper, "genre", "collex", field_value=genre)
+            self.__add_subelement(self.siro_wrapper, "genre", "collex", field_value=genre)
 
     def __add_type(self):
         """Find 1 type for each item."""
@@ -213,21 +217,21 @@ class BuildRdf():
             record_type = "Codex"
 
         else:
-            record_type = "Codex"
+            record_type = self.line_reference["type"].title()
 
-        rtype = self.__add_subelement(self.siro_wrapper, "type", "dc", field_value=record_type)
+        self.__add_subelement(self.siro_wrapper, "type", "dc", field_value=record_type)
 
     def __add_freecultures(self):
         # Generate freeculture field.
-        
-        if self.line_reference["freeculture"] == "":
+
+        if self.line_reference.get("freeculture", "") == "":
             self.freecultures = ["TRUE"]
-            
+
         else:
             self.freecultures = [self.line_reference["freeculture"]]
-            
+
         for freeculture in set(self.freecultures):
-            freeculture_field = self.__add_subelement(self.siro_wrapper, "freeculture", "collex", field_value=freeculture)
+            self.__add_subelement(self.siro_wrapper, "freeculture", "collex", field_value=freeculture)
 
     def __add_date(self):
         """Heuristic for date handling."""
@@ -256,16 +260,20 @@ class BuildRdf():
         else:
             date_field = self.__add_subelement(self.siro_wrapper, "date", "dc")
             collex_date_wrapper = self.__add_subelement(date_field, "date", "collex")
-            rdf_date_label = self.__add_subelement(collex_date_wrapper,
-                                                   "label", "rdfs", field_value=date_label)
-            rdf_date_label = self.__add_subelement(collex_date_wrapper,
-                                                   "value", "rdf", field_value=date_value)
+            self.__add_subelement(
+                collex_date_wrapper,
+                "label", "rdfs", field_value=date_label
+            )
+            self.__add_subelement(
+                collex_date_wrapper,
+                "value", "rdf", field_value=date_value
+            )
 
     def __get_role(self):
         """Check for role value in tsv data, use default if blank."""
         if not self.line_reference["role"].strip():
 
-            return ["CRE"]*len(self.creators)
+            return ["CRE"] * len(self.creators)
         else:
             return [role.strip() for role in self.line_reference["role"].split("|")]
 
