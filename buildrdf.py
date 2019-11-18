@@ -26,14 +26,20 @@ class BuildRdf():
             "dc": "http://purl.org/dc/elements/1.1/",
             "sro": "http://www.lib.msu.edu/sro/schema#",
         }
+        self.file_count = 0
 
-    def build_rdf_from_tsv(self, tsv_path, output_path, lines_to_process=None):
+    def __set_rdf_root(self):
+        """Set or reset RDF root to rebegin new file."""
+        self.rdf_root = etree.Element("{{{0}}}RDF".format(self.ns_map["rdf"]), nsmap=self.ns_map)
+
+    def build_rdf_from_tsv(self, tsv_path, output_path, lines_to_process=None, records_per_file=500):
         """Initialize processing of tsv file.
 
         args:
         tsv_path (str) -- path to tsv file.
         lines_to_process (int) -- allow user to determine number of lines in tsv to process.
         """
+        self.records_per_file = records_per_file
         self.output_path = output_path
         self.lines_to_process = lines_to_process
         self.tsv_path = tsv_path
@@ -44,12 +50,12 @@ class BuildRdf():
                             "title", "archive", "genre", "freeculture", "original_query", "subjects",
                             "date", "type", "thumbnail", "seeAlso"]
         """
-        self.rdf_root = etree.Element("{{{0}}}RDF".format(self.ns_map["rdf"]), nsmap=self.ns_map)
+        self.__set_rdf_root()
 
         if self.__check_file():
-            rdf = self.__read_tsv()
-            with codecs.open(self.output_path, "w", "utf-8") as output_file:
-                output_file.write(etree.tostring(self.rdf_root, encoding="unicode", pretty_print=True))
+            self.__read_tsv()
+            self.__write_rdf()
+            print("Processed {0} records".format(self.lines_processed))
 
         else:
             print("Invalid path -- File Doesn't Exist: {0}".format(self.tsv_path))
@@ -61,7 +67,7 @@ class BuildRdf():
             if not self.lines_to_process:
                 self.lines_to_process = len(tsv_file.readlines())
 
-            print("Processing {0} records...".format(self.lines_to_process))
+            print("Processing {0} records...".format(self.lines_to_process - 1))
 
             # The previous readlines() call moved the pointer to the end of the file, making iteration
             # impossible. This line resets the pointer.
@@ -76,6 +82,20 @@ class BuildRdf():
                     self.rdf_root.append(rdf)
                     self.lines_processed += 1
 
+    def __write_rdf(self):
+        """Write all RDF processed up to the current line."""
+        if self.file_count > 0:
+            output_parts = os.path.splitext(self.output_path)
+            output_path = output_parts[0] + "_{0}".format(self.file_count) + output_parts[1]
+        else:
+            output_path = self.output_path
+
+        with codecs.open(output_path, "w", "utf-8") as output_file:
+            output_file.write(etree.tostring(self.rdf_root, encoding="unicode", pretty_print=True))
+
+        self.file_count += 1
+        self.__set_rdf_root()
+
     def __process_line(self, line):
         """Process individual line of tsv file.
 
@@ -85,8 +105,11 @@ class BuildRdf():
         self.line_data = line.split("\t")
         self.line_reference = {}
         self.line_reference.update(zip(self.headings, self.line_data))
-        if self.lines_processed % 500 == 0:
+
+        if self.lines_processed % self.records_per_file == 0 and self.lines_processed != 0:
+            self.__write_rdf()
             print("Processed {0} records".format(self.lines_processed))
+
         """
         print "{0} : {1}".format(
             self.line_reference["id"].encode("ascii", errors="ignore"),
@@ -126,11 +149,14 @@ class BuildRdf():
         self.__add_subelement(self.siro_wrapper, "title", "dc", field_value=self.line_reference["title"])
         self.__add_creators()
         self.__add_subelement(self.siro_wrapper, "source", "dc", field_value=self.line_reference["source"])
-        self.__add_subelement(
-            self.siro_wrapper,
-            "description", "dc",
-            field_value="\n".join([d.strip(":").strip() for d in self.line_reference["description"].split("|")])
-        )
+        try:
+            self.__add_subelement(
+                self.siro_wrapper,
+                "description", "dc",
+                field_value="\n".join([d.strip(":").strip() for d in self.line_reference["description"].split("|")])
+            )
+        except KeyError as keye:
+            pass
 
         for subject in self.line_reference["subjects"].split("|"):
             self.__add_subelement(self.siro_wrapper, "subject", "dc", field_value=subject.strip())
