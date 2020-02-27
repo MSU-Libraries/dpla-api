@@ -13,7 +13,7 @@ class BuildRdf():
         self.default_values = {
             "discipline": ["History"],
             "role": ["CRE"],
-            "archive": archive,
+            "archive": [archive],
             "genre": ["Unspecified"],
             "freeculture": ["TRUE"]
         }
@@ -138,7 +138,7 @@ class BuildRdf():
         """Process data into RDF."""
         # The triple-{} includes a literal "{}" and a {} that operates the format string.
         # That is, one escapes braces in a format string by doubling them.
-        self.siro_wrapper = etree.Element("{{{0}}}{1}".format(self.ns_map["sro"], self.default_values["archive"]))
+        self.siro_wrapper = etree.Element("{{{0}}}{1}".format(self.ns_map["sro"], self.default_values["archive"][0]))
         siro_wrapper_attribute = "{{{0}}}about".format(self.ns_map["rdf"])
         self.siro_wrapper.attrib[siro_wrapper_attribute] = self.line_reference["id"]
         self.__add_subelement(self.siro_wrapper, "federation", "collex", field_value="SiRO")
@@ -149,15 +149,8 @@ class BuildRdf():
         self.__add_subelement(self.siro_wrapper, "title", "dc", field_value=self.line_reference["title"])
         self.__add_creators()
         self.__add_subelement(self.siro_wrapper, "source", "dc", field_value=self.line_reference["source"])
-        try:
-            self.__add_subelement(
-                self.siro_wrapper,
-                "description", "dc",
-                field_value="\n".join([d.strip(":").strip() for d in self.line_reference["description"].split("|")])
-            )
-        except KeyError as keye:
-            pass
-
+        if self.line_reference["description"].strip():
+            self.__add_subelement(self.siro_wrapper, "description", "dc", field_value=self.line_reference["description"])
         for subject in self.line_reference["subjects"].split("|"):
             self.__add_subelement(self.siro_wrapper, "subject", "dc", field_value=subject.strip())
 
@@ -335,6 +328,10 @@ class BuildRdf():
                 subelement.attrib[key] = value
 
         if field_value is not None:
+            if field_value.startswith(('"', "'", '"')):
+                field_value = field_value[1:]
+            if field_value.endswith(('"', "'", '"')):
+                field_value = field_value[:-1]
             subelement.text = field_value
 
         return subelement

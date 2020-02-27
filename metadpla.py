@@ -22,6 +22,7 @@ class DplaMetadata():
                         "type": [],
                         "creator": [],
                         "language": [],
+                        "description": "",
                     }
 
         if "date" in self.metadata:
@@ -47,6 +48,13 @@ class DplaMetadata():
 
             else:
                 record["title"] = self.metadata["title"]
+
+        if "description" in self.metadata:
+            if isinstance(self.metadata["description"], list):
+                record["description"] = self.metadata["description"][0]
+
+            else:
+                record["description"] = self.metadata["description"]
 
         if "subject" in self.metadata:
             record["subjects"] = [subject["name"] for subject in self.metadata["subject"] if "name" in subject]
