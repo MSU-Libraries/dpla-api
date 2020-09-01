@@ -181,7 +181,8 @@ class BuildRdf():
 
         if self.line_reference["thumbnail"].strip():
             self.__add_subelement(self.siro_wrapper, "thumbnail", "collex", attributes={"{{{0}}}resource".format(self.ns_map["rdf"]): self.line_reference["thumbnail"]})
-
+        if self.line_reference["image"].strip():
+            self.__add_subelement(self.siro_wrapper, "image", "collex", attributes={"{{{0}}}resource".format(self.ns_map["rdf"]): self.line_reference["image"]})
         return self.siro_wrapper
         """
         with codecs.open("rdf/20170616/{0}.xml".format(os.path.basename(self.line_reference["id"])), "w", "utf-8") as output_file:
